@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini-Powered Shell Sort Visualizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .array-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            justify-content: center;
+            align-items: center;
+            min-height: 4rem;
+        }
+        .array-box {
+            width: 3.5rem;
+            height: 3.5rem;
+            border-radius: 0.5rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: white;
+            transition: all 0.3s ease-in-out, transform 0.3s ease-in-out;
+            position: relative;
+        }
+        .highlight-swap {
+            transform: scale(1.1);
+            box-shadow: 0 0 15px 5px rgba(236, 72, 153, 0.7);
+        }
+        .highlight-compare {
+             box-shadow: 0 0 15px 5px rgba(59, 130, 246, 0.6);
+        }
+        .loader {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-5xl bg-white rounded-xl shadow-2xl p-6 md:p-10 space-y-8">
+        <!-- Title and Input Area -->
+        <div class="text-center">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900">Gemini-Powered Shell Sort Visualizer</h1>
+            <p class="text-gray-600 mt-2">Enter comma-separated numbers to sort and watch how Gemini sorts them for you step-by-step.</p>
+        </div>
+
+        <div class="flex flex-col sm:flex-row items-center gap-4">
+            <input id="array-input" type="text" placeholder="e.g., 5, 3, 7, 2, 8, 4, 1, 9" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition">
+            <button id="generate-btn" class="w-full sm:w-auto flex items-center justify-center gap-2 bg-cyan-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-cyan-700 transition-all duration-300 shadow-md">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c.3 0 .5.1.8.2l4.8 2.3c.8.4 1.4 1.2 1.4 2.2v5c0 .7-.4 1.4-1.1 1.8l-4.4 2.9c-.5.3-1.2.3-1.7 0l-4.4-2.9c-.7-.4-1.1-1.1-1.1-1.8v-5c0-1 .6-1.8 1.4-2.2l4.8-2.3c.3-.1.5-.2.8-.2z"/><path d="m21.4 12.3-5.5 3.2"/><path d="m2.6 12.3 5.5 3.2"/><path d="m12 21.8V15.5"/></svg>
+                <span>✨ Visualize & Explain</span>
+            </button>
+        </div>
+
+        <!-- Loader and Error Messages -->
+        <div id="loader-container" class="hidden justify-center items-center flex-col gap-4 p-8">
+            <div class="loader"></div>
+            <p class="text-cyan-700 font-medium">Gemini is preparing the explanations and visuals for you... Please wait.</p>
+        </div>
+        <div id="error-container" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg" role="alert">
+            <strong class="font-bold">Error!</strong>
+            <span class="block sm:inline" id="error-message"></span>
+        </div>
+
+
+        <!-- Dynamic Content Area -->
+        <div id="visualization-container" class="space-y-8">
+             <!-- Content from Gemini will be added here -->
+             <div class="text-center p-8 border-2 border-dashed border-gray-300 rounded-lg">
+                <p class="text-gray-500">Please enter an array above and click the button to see the results.</p>
+             </div>
+        </div>
+
+    </div>
+
+<script>
+    const generateBtn = document.getElementById('generate-btn');
+    const arrayInput = document.getElementById('array-input');
+    const visualizationContainer = document.getElementById('visualization-container');
+    const loaderContainer = document.getElementById('loader-container');
+    const errorContainer = document.getElementById('error-container');
+    const errorMessage = document.getElementById('error-message');
+
+    generateBtn.addEventListener('click', async () => {
+        const userInput = arrayInput.value.trim();
+        if (!userInput) {
+            showError("Please enter an array to sort.");
+            return;
+        }
+
+        const numbers = userInput.split(',').map(n => parseInt(n.trim())).filter(n => !isNaN(n));
+        
+        if (numbers.length < 2) {
+            showError("Please enter a valid array with at least 2 numbers.");
+            return;
+        }
+
+        hideError();
+        visualizationContainer.innerHTML = '';
+        loaderContainer.style.display = 'flex';
+
+        try {
+            // Prompt to be sent to the Gemini API
+            const prompt = `
+                Explain the Shell Sort algorithm step-by-step for a web page.
+                The user-provided array is: [${numbers.join(', ')}].
+                Prepare the explanation in JSON format, strictly adhering to the following schema:
+                
+                {
+                  "initial_array": [numbers],
+                  "gap_sequence": [gap_values],
+                  "steps": [
+                    {
+                      "gap": int,
+                      "pass_explanation": "A short text explaining what is done in this pass.",
+                      "comparisons": [
+                        {
+                          "sub_array_indices": [index1, index2, ...],
+                          "sub_array_values": [value1, value2, ...],
+                          "explanation": "What happens in this sub-array (comparison, whether it's sorted, whether a swap was made).",
+                          "is_swapped": boolean,
+                          "values_after_swap": [value1, value2, ...]
+                        }
+                      ],
+                      "array_after_pass": [numbers]
+                    }
+                  ],
+                  "final_array": [numbers],
+                  "summary": "A general summary of the entire process and the advantages of Shell Sort for this array."
+                }
+
+                Write the explanations in a simple, clear, and educational tone. All text must be in English.
+            `;
+            
+            const chatHistory = [{ role: "user", parts: [{ text: prompt }] }];
+            const payload = { contents: chatHistory };
+            const apiKey = ""; // IMPORTANT: Paste your Gemini API Key here
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                 throw new Error(`API error: ${response.status} ${response.statusText}`);
+            }
+
+            const result = await response.json();
+
+             if (result.candidates && result.candidates.length > 0 &&
+                result.candidates[0].content && result.candidates[0].content.parts &&
+                result.candidates[0].content.parts.length > 0) {
+                
+                // Clean up the text from Gemini and parse it as JSON
+                const rawText = result.candidates[0].content.parts[0].text;
+                const jsonText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+                const data = JSON.parse(jsonText);
+                renderVisualization(data);
+            } else {
+                 throw new Error("A valid response could not be retrieved from the API. Please try again.");
+            }
+
+        } catch (error) {
+            console.error('Error:', error);
+            showError(`An error occurred: ${error.message}`);
+        } finally {
+            loaderContainer.style.display = 'none';
+        }
+    });
+    
+    // Function to show an error message
+    function showError(message) {
+        errorMessage.textContent = message;
+        errorContainer.style.display = 'block';
+    }
+    
+    // Function to hide the error message
+    function hideError() {
+         errorContainer.style.display = 'none';
+    }
+
+    // Main function to render HTML from the incoming JSON data
+    function renderVisualization(data) {
+        let html = '';
+
+        // 1. Initial State
+        html += createSectionHtml("1. Initial State", "The algorithm starts with this array:", createArrayHtml(data.initial_array));
+        
+        // Gap Sequence
+        html += `
+            <div class="bg-gray-50 border border-gray-200 p-4 rounded-lg">
+                <p class="text-center text-gray-700">
+                    Gap sequence to be used: <strong class="font-semibold text-cyan-700">${data.gap_sequence.join(', ')}</strong>
+                </p>
+            </div>
+        `;
+
+        // 2. Sorting Steps
+        data.steps.forEach((step, index) => {
+            let comparisonsHtml = '<div class="grid md:grid-cols-2 gap-6 pt-4">';
+            step.comparisons.forEach(comp => {
+                comparisonsHtml += `
+                    <div class="bg-gray-50 border border-gray-200 p-4 rounded-lg text-center space-y-3">
+                        <h4 class="text-md font-semibold text-gray-800">Sub-array (Indices: ${comp.sub_array_indices.join(', ')})</h4>
+                        <div class="flex items-center justify-center gap-4">
+                            <div class="array-container">${createArrayHtml(comp.sub_array_values, [], 'bg-pink-500')}</div>
+                            ${comp.is_swapped ? `
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-cyan-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                                </svg>
+                                <div class="array-container">${createArrayHtml(comp.values_after_swap, [], 'bg-emerald-500')}</div>
+                            ` : ''}
+                        </div>
+                        <p class="text-sm text-gray-600 min-h-[2.5rem]">${comp.explanation}</p>
+                    </div>
+                `;
+            });
+            comparisonsHtml += '</div>';
+
+            html += createSectionHtml(
+                `Step ${index + 2}: Gap = ${step.gap}`,
+                step.pass_explanation,
+                comparisonsHtml + `<h4 class="font-semibold mt-6 mb-2 text-center">Array State After This Pass</h4>` + createArrayHtml(step.array_after_pass)
+            );
+        });
+
+        // Result
+        html += createSectionHtml("Result", "Sorting is complete. The final state of the array is:", createArrayHtml(data.final_array, [], 'bg-green-500'));
+
+        // Summary
+        html += `
+            <div class="bg-cyan-50 border border-cyan-200 rounded-lg p-5 mt-8">
+                <h3 class="text-xl font-bold text-cyan-900 mb-2 text-center">✨ Gemini's Summary</h3>
+                <p class="text-center text-cyan-800">${data.summary}</p>
+            </div>
+        `;
+
+        visualizationContainer.innerHTML = html;
+    }
+
+    // Helper function to create HTML sections
+    function createSectionHtml(title, description, content) {
+        return `
+            <div class="space-y-4 py-4">
+                <h2 class="text-2xl font-semibold border-b-2 border-gray-200 pb-2 text-gray-800">${title}</h2>
+                <p class="text-gray-600">${description}</p>
+                <div class="pt-2">${content}</div>
+            </div>
+        `;
+    }
+
+    // Helper function to create array boxes
+    function createArrayHtml(array, highlightedIndices = [], colorClass = 'bg-orange-500') {
+        let boxes = array.map((num, index) => {
+            const isHighlighted = highlightedIndices.includes(index);
+            return `<div class="array-box ${colorClass} ${isHighlighted ? 'highlight-swap' : ''}">${num}</div>`;
+        }).join('');
+        return `<div class="array-container">${boxes}</div>`;
+    }
+
+</script>
+</body>
+</html>
